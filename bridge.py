@@ -9,7 +9,6 @@ import logging
 import os
 import signal
 import struct
-import sys
 import time
 from typing import Any, Dict, Optional, Tuple
 
@@ -29,9 +28,11 @@ logger = logging.getLogger("inkbird-bridge")
 
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
 
-# Inkbird UUIDs & Plausibility Constants
+# Inkbird Constants
 INKBIRD_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb"
 HUMIDITY_NOT_FITTED = frozenset((0, 0xFFFF))
+MIN_PLAUSIBLE_TEMP_C = -40.0
+MAX_PLAUSIBLE_TEMP_C = 85.0
 
 
 class InkbirdBridge:
@@ -95,6 +96,10 @@ class InkbirdBridge:
                 temp_raw, hum_raw = struct.unpack("<hH", raw[0:4])
                 temp_c = temp_raw / 100.0
 
+                # Validate temperature bounds
+                if temp_c < MIN_PLAUSIBLE_TEMP_C or temp_c > MAX_PLAUSIBLE_TEMP_C:
+                    continue
+
                 # Plausibility check on humidity
                 if hum_raw in HUMIDITY_NOT_FITTED:
                     hum = None
@@ -104,7 +109,7 @@ class InkbirdBridge:
                         hum = None
 
                 bat = int(raw[7]) if len(raw) > 7 else None
-                if bat is not None and bat > 100:
+                if bat is not None and (bat > 100 or bat < 0):
                     bat = None
 
                 return temp_c, hum, bat
@@ -113,9 +118,13 @@ class InkbirdBridge:
             elif msg_len == 18:
                 temp_raw, hum_raw = struct.unpack("<hH", raw[6:10])
                 temp_c = temp_raw / 100.0
+
+                if temp_c < MIN_PLAUSIBLE_TEMP_C or temp_c > MAX_PLAUSIBLE_TEMP_C:
+                    continue
+
                 hum = hum_raw / 100.0 if hum_raw <= 10000 else None
                 bat = int(raw[10]) if len(raw) > 10 else None
-                if bat is not None and bat > 100:
+                if bat is not None and (bat > 100 or bat < 0):
                     bat = None
 
                 return temp_c, hum, bat
@@ -255,14 +264,14 @@ class InkbirdBridge:
 
     def detection_callback(self, device: BLEDevice, advertisement_data: AdvertisementData):
         mac = device.address.lower()
-        name = (device.name or advertisement_data.local_name or "").lower()
+        name = (device.name or advertisement_data.local_name or "").lower().strip()
 
         # Match known devices or recognized Inkbird identifiers
         is_known = mac in self.device_map
         is_inkbird = (
-            "sps" in name
-            or "tps" in name
-            or "ink" in name
+            name in ("sps", "tps")
+            or name.startswith("ink")
+            or name.startswith("ibs-")
             or INKBIRD_SERVICE_UUID in [str(u).lower() for u in advertisement_data.service_uuids]
         )
 
