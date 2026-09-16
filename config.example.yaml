@@ -1,0 +1,30 @@
+# Inkbird to Home Assistant BLE Bridge Configuration
+
+home_assistant:
+  # Primary Home Assistant URL (local network, Tailscale, or Nabu Casa)
+  url: "http://192.168.50.106:8123"
+  # Fallback URL if primary is unreachable
+  fallback_url: "http://100.124.108.26:8123"
+  # Long-Lived Access Token generated from Home Assistant
+  token: "YOUR_HA_LONG_LIVED_ACCESS_TOKEN_HERE"
+
+bridge:
+  # Minimum interval in seconds between pushing unchanged readings to HA
+  min_update_interval_sec: 30
+  # Maximum interval in seconds to force push latest readings even if unchanged
+  force_update_interval_sec: 120
+  # Temperature threshold (°C) to trigger an immediate push to HA
+  temp_delta_threshold: 0.1
+  # Humidity threshold (%) to trigger an immediate push to HA
+  humidity_delta_threshold: 0.5
+  # Unit to publish: "F" for Fahrenheit, "C" for Celsius
+  temperature_unit: "F"
+
+# Known sensor mappings
+devices:
+  "49:26:04:25:02:13":
+    name: "ParkingLot"
+    entity_prefix: "sensor.ibs_th_0213"
+  "49:26:04:25:06:54":
+    name: "McFridge"
+    entity_prefix: "sensor.ibs_th_0654"
